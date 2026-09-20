@@ -7,9 +7,9 @@ import SearchField from '../components/common/SearchField';
 import LoadingScreen from '../components/common/LoadingScreen';
 
 const STATUS_CONFIG = {
-  'In Stock':     { color: 'text-emerald-700', bg: 'bg-emerald-100', border: 'border-emerald-200', icon: CheckCircle },
-  'Low Stock':    { color: 'text-amber-700',   bg: 'bg-amber-100',   border: 'border-amber-200',   icon: AlertTriangle },
-  'Out of Stock': { color: 'text-rose-700',    bg: 'bg-rose-100',    border: 'border-rose-200',    icon: XCircle },
+  'In Stock': { color: 'text-emerald-700', bg: 'bg-emerald-100', border: 'border-emerald-200', icon: CheckCircle },
+  'Low Stock': { color: 'text-amber-700', bg: 'bg-amber-100', border: 'border-amber-200', icon: AlertTriangle },
+  'Out of Stock': { color: 'text-rose-700', bg: 'bg-rose-100', border: 'border-rose-200', icon: XCircle },
 };
 
 const Inventory = () => {
@@ -34,6 +34,27 @@ const Inventory = () => {
     const query = search.trim().toLowerCase();
     return matchesStatus && (!query || item.name.toLowerCase().includes(query) || item.sku.toLowerCase().includes(query) || item.category.toLowerCase().includes(query));
   });
+  useEffect(() => {
+    inventoryService.getInventory().then((res) => {
+      if (res.success) {
+        setInventory(res.data);
+        setFiltered(res.data);
+      }
+      setLoading(false);
+    });
+  }, []);
+
+  useEffect(() => {
+    let result = inventory;
+    if (statusFilter !== 'All') result = result.filter((i) => i.status === statusFilter);
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter((i) =>
+        i.name.toLowerCase().includes(q) || i.sku.toLowerCase().includes(q) || i.category.toLowerCase().includes(q)
+      );
+    }
+    setFiltered(result);
+  }, [search, statusFilter, inventory]);
 
   const showToast = (msg) => {
     setToastMsg(msg);
@@ -100,20 +121,20 @@ const Inventory = () => {
       {/* Toast */}
       {toastMsg && (
         <div className="fixed top-6 right-6 z-50 bg-emerald-50 px-5 py-3 rounded-xl text-sm text-emerald-800 border border-emerald-200 shadow-xl animate-bounce font-medium">
-          {toastMsg}
-        </div>
+            {toastMsg}
+          </div>
       )}
 
-      {/* Header */}
-      <div>
+          {/* Header */}
+          <div>
         <h1 className="text-2xl font-bold text-slate-900">Inventory</h1>
         <p className="text-slate-500 mt-1">Monitor stock levels and manage product inventory.</p>
-      </div>
-      {inventoryQuery.isFetching && <p className="text-xs text-slate-400">Refreshing inventory data...</p>}
+      </div >
+  { inventoryQuery.isFetching && <p className="text-xs text-slate-400">Refreshing inventory data...</p> }
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="glass-card p-5 flex items-center gap-4">
+{/* Summary Cards */ }
+<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+  <div className="glass-card p-5 flex items-center gap-4">
           <div className="p-3 rounded-xl bg-brand-100">
             <Package className="w-6 h-6 text-brand-600" />
           </div>
@@ -121,7 +142,7 @@ const Inventory = () => {
             <p className="text-slate-500 text-sm">Total SKUs</p>
             <p className="text-2xl font-bold text-slate-900">{totalItems}</p>
           </div>
-        </div>
+        </div >
         <div className="glass-card p-5 flex items-center gap-4">
           <div className="p-3 rounded-xl bg-amber-100">
             <AlertTriangle className="w-6 h-6 text-amber-600" />
@@ -138,12 +159,12 @@ const Inventory = () => {
           <div>
             <p className="text-slate-500 text-sm">Out of Stock</p>
             <p className="text-2xl font-bold text-slate-900">{outOfStockCount}</p>
-          </div>
-        </div>
       </div>
+    </div>
+  </div>
 
-      {/* Controls */}
-      <div className="flex flex-col md:flex-row gap-3">
+{/* Controls */ }
+<div className="flex flex-col md:flex-row gap-3">
         <SearchField
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -151,24 +172,23 @@ const Inventory = () => {
           className="flex-1"
         />
         <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl p-1">
-          {['All', 'In Stock', 'Low Stock', 'Out of Stock'].map((s) => (
-            <button
-              key={s}
-              onClick={() => setStatusFilter(s)}
-              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
-                statusFilter === s
-                  ? 'bg-brand-600 text-white shadow-sm'
-                  : 'text-slate-500 hover:text-slate-900'
-              }`}
-            >
-              {s}
-            </button>
-          ))}
-        </div>
-      </div>
+      {['All', 'In Stock', 'Low Stock', 'Out of Stock'].map((s) => (
+        <button
+          key={s}
+          onClick={() => setStatusFilter(s)}
+          className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${statusFilter === s
+            ? 'bg-brand-600 text-white shadow-sm'
+            : 'text-slate-500 hover:text-slate-900'
+            }`}
+        >
+          {s}
+        </button>
+      ))}
+    </div>
+  </div>
 
-      {/* Table */}
-      <div className="glass-card overflow-hidden">
+{/* Table */ }
+<div className="glass-card overflow-hidden">
         <PaginationToolbar
           currentPage={currentPage}
           totalPages={totalPages}
@@ -241,20 +261,21 @@ const Inventory = () => {
                         </button>
                       )}
                     </td>
-                  </tr>
+                  </tr >
                 );
               })}
-            </tbody>
-          </table>
-          {filtered.length === 0 && (
-            <div className="py-12 text-center text-slate-400">
-              <Package className="w-10 h-10 mx-auto mb-3 opacity-30" />
-              <p>No items match your search or filter.</p>
-            </div>
-          )}
-        </div>
+            </tbody >
+          </table >
+{
+  filtered.length === 0 && (
+    <div className="py-12 text-center text-slate-400">
+        <Package className="w-10 h-10 mx-auto mb-3 opacity-30" />
+        <p>No items match your search or filter.</p>
       </div>
+          )}
     </div>
+      </div>
+    </div >
   );
 };
 

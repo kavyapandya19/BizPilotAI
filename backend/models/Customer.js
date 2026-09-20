@@ -36,6 +36,14 @@ const CustomerSchema = new mongoose.Schema({
     min: 0,
     max: 100
   },
+  retentionCampaign: {
+    lastSentAt: { type: Date },
+    status: { type: String, enum: ['None', 'Sent', 'Scheduled'], default: 'None' },
+    subject: { type: String },
+    incentive: { type: String },
+    churnScoreAtSend: { type: Number },
+    channel: { type: String, default: 'email' }
+  },
   createdAt: {
     type: Date,
     default: Date.now

@@ -1,7 +1,6 @@
 import React, { useContext, useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../../context/AuthContext';
-import SearchField from './SearchField';
 import {
   Bell,
   Search,

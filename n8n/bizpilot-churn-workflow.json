@@ -1,0 +1,137 @@
+{
+  "name": "BizPilot AI - Autonomous Churn Win-Back Retention Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "bizpilot-churn-retention",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "1",
+      "name": "BizPilot Churn Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "webhookId": "bizpilot-churn-retention"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.body.customer.churnRisk }}",
+              "operation": "largerEqual",
+              "value2": 70
+            }
+          ]
+        }
+      },
+      "id": "2",
+      "name": "Verify High Churn Risk (>= 70%)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        480,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract incoming BizPilot AI customer & campaign data\nconst input = $input.item.json.body;\nconst customer = input.customer || {};\nconst campaign = input.campaign || {};\n\nconst firstName = customer.name ? customer.name.split(' ')[0] : 'Valued Customer';\nconst segment = customer.segment || 'Standard';\nconst incentiveCode = campaign.incentiveCode || 'VIP-SAVE15';\nconst incentiveDesc = campaign.incentiveDesc || '15% Off Your Next Restock';\nconst churnRisk = customer.churnRisk || 75;\nconst recencyDays = customer.recencyDays || 45;\nconst rawBody = campaign.body || '';\n\n// Generate responsive, branded HTML email template\nconst htmlBody = `\n<!DOCTYPE html>\n<html>\n<head>\n  <meta charset=\"utf-8\">\n  <style>\n    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0f172a; color: #e2e8f0; margin: 0; padding: 24px; }\n    .container { max-width: 580px; margin: 0 auto; background: #1e293b; border-radius: 16px; border: 1px solid #334155; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5); }\n    .header { background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); padding: 32px 24px; text-align: center; color: #ffffff; }\n    .header h1 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.5px; }\n    .header p { margin: 6px 0 0 0; opacity: 0.85; font-size: 14px; }\n    .content { padding: 28px 24px; font-size: 14px; line-height: 1.6; color: #cbd5e1; }\n    .voucher-box { background: #0f172a; border: 1px dashed #6366f1; border-radius: 12px; padding: 20px; text-align: center; margin: 24px 0; }\n    .voucher-code { font-family: monospace; font-size: 22px; font-weight: bold; color: #818cf8; letter-spacing: 2px; background: #1e1b4b; padding: 8px 16px; border-radius: 8px; display: inline-block; margin-top: 8px; }\n    .footer { background: #0f172a; border-top: 1px solid #334155; padding: 18px 24px; text-align: center; font-size: 12px; color: #64748b; }\n  </style>\n</head>\n<body>\n  <div class=\"container\">\n    <div class=\"header\">\n      <h1>BizPilot AI</h1>\n      <p>Exclusive Customer Appreciation & Win-Back Offer</p>\n    </div>\n    <div class=\"content\">\n      <p>Hello <strong>${customer.name}</strong>,</p>\n      <p>${rawBody.replace(/\\n/g, '<br>')}</p>\n      \n      <div class=\"voucher-box\">\n        <div style=\"font-size: 13px; color: #94a3b8;\">YOUR EXCLUSIVE ${segment.toUpperCase()} INCENTIVE</div>\n        <div style=\"font-size: 15px; color: #ffffff; font-weight: 600; margin-top: 4px;\">${incentiveDesc}</div>\n        <div class=\"voucher-code\">${incentiveCode}</div>\n      </div>\n      \n      <p style=\"font-size: 12px; color: #94a3b8;\">\n        * Automatically calibrated by BizPilot AI Retention Intelligence (RandomForest Churn Assessment: ${churnRisk}% risk, ${recencyDays}d inactivity interval).\n      </p>\n    </div>\n    <div class=\"footer\">\n      &copy; 2026 BizPilot AI Platform • Autonomous Enterprise Operations\n    </div>\n  </div>\n</body>\n</html>\n`;\n\nreturn {\n  json: {\n    recipientEmail: customer.email,\n    recipientName: customer.name,\n    subject: campaign.subject || `Special Retention Offer for ${customer.name}`,\n    htmlBody,\n    incentiveCode,\n    churnRisk,\n    deliveredVia: 'n8n_workflow_engine',\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "id": "3",
+      "name": "Format Branded HTML Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        720,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "retention@bizpilot.ai",
+        "toEmail": "={{ $json.recipientEmail }}",
+        "subject": "={{ $json.subject }}",
+        "html": "={{ $json.htmlBody }}",
+        "options": {}
+      },
+      "id": "4",
+      "name": "Send Win-Back Email (SMTP)",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [
+        940,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": true,\n  \"message\": \"n8n Churn Retention Workflow Executed Successfully\",\n  \"n8nExecutionId\": \"{{ $execution.id }}\",\n  \"recipient\": \"{{ $json.recipientEmail }}\",\n  \"churnRisk\": {{ $json.churnRisk }},\n  \"incentive\": \"{{ $json.incentiveCode }}\",\n  \"deliveredAt\": \"{{ $json.timestamp }}\"\n}",
+        "options": {}
+      },
+      "id": "5",
+      "name": "Respond to BizPilot",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1160,
+        280
+      ]
+    }
+  ],
+  "connections": {
+    "BizPilot Churn Webhook": {
+      "main": [
+        [
+          {
+            "node": "Verify High Churn Risk (>= 70%)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify High Churn Risk (>= 70%)": {
+      "main": [
+        [
+          {
+            "node": "Format Branded HTML Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Branded HTML Email": {
+      "main": [
+        [
+          {
+            "node": "Send Win-Back Email (SMTP)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Win-Back Email (SMTP)": {
+      "main": [
+        [
+          {
+            "node": "Respond to BizPilot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
