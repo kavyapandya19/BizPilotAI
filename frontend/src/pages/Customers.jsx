@@ -99,6 +99,11 @@ const Customers = () => {
   const [showModelDetails, setShowModelDetails] = useState(false);
   const [expandedCustomerId, setExpandedCustomerId] = useState(null);
   const [notification, setNotification] = useState('');
+  const [campaignReviewOpen, setCampaignReviewOpen] = useState(false);
+  const [campaignPhase, setCampaignPhase] = useState('idle');
+  const [campaignSummary, setCampaignSummary] = useState(null);
+  const [showCampaignAccounts, setShowCampaignAccounts] = useState(false);
+  const [campaignAccountsPage, setCampaignAccountsPage] = useState(1);
 
   // Email modal state
   const [emailModalCustomer, setEmailModalCustomer] = useState(null);
@@ -175,26 +180,35 @@ const Customers = () => {
   // BATCH RETENTION CAMPAIGN
   // ---------------------------------------------------------
   const batchCampaignMutation = useMutation({
-    mutationFn: () =>
-      customerService.launchBatchRetentionCampaign(70),
+    mutationFn: async () => {
+      setCampaignPhase('preparing');
+      await Promise.resolve();
+      setCampaignPhase('generating');
+      return customerService.launchBatchRetentionCampaign(70);
+    },
 
     onSuccess: (res) => {
+      const summary = res?.data || {};
+      setCampaignSummary(summary);
+      setCampaignPhase('completed');
+      setCampaignReviewOpen(false);
+      setShowCampaignAccounts(false);
+      setCampaignAccountsPage(1);
       queryClient.invalidateQueries({
         queryKey: ['customers'],
       });
 
       setNotification(
-        `AI Retention Campaign Complete: Dispatched ${
-          res?.count || highRisk
-        } win-back emails!`
+        `AI Retention Campaign Complete: Sent ${summary.sent || 0} of ${summary.totalEligible || highRisk} emails.`
       );
 
       setTimeout(() => setNotification(''), 5000);
     },
 
-    onError: () => {
+    onError: (error) => {
+      setCampaignPhase('failed');
       setNotification(
-        'Unable to launch the retention campaign. Please try again.'
+        error.response?.data?.message || 'Unable to launch the retention campaign. Please try again.'
       );
 
       setTimeout(() => setNotification(''), 5000);
@@ -202,12 +216,35 @@ const Customers = () => {
   });
 
   const handleBatchRetentionCampaign = () => {
-    setNotification(
-      'AI Agent launching automated win-back campaign for high churn accounts...'
-    );
-
-    batchCampaignMutation.mutate();
+    if (highRisk > 0 && !batchCampaignMutation.isPending) {
+      setCampaignReviewOpen(true);
+      setCampaignPhase('review');
+    }
   };
+
+  const confirmBatchRetentionCampaign = () => {
+    if (!batchCampaignMutation.isPending) {
+      batchCampaignMutation.mutate();
+    }
+  };
+
+  const campaignAccounts = useMemo(() => {
+    const customerMap = new Map(customers.map((customer) => [String(customer.id), customer]));
+    return (campaignSummary?.results || []).map((result) => ({
+      ...customerMap.get(String(result.id)),
+      ...result,
+    }));
+  }, [campaignSummary, customers]);
+
+  const campaignAccountsPerPage = 8;
+  const campaignAccountsTotalPages = Math.max(1, Math.ceil(campaignAccounts.length / campaignAccountsPerPage));
+  const visibleCampaignAccounts = campaignAccounts.slice(
+    (campaignAccountsPage - 1) * campaignAccountsPerPage,
+    campaignAccountsPage * campaignAccountsPerPage
+  );
+
+  const alreadyContacted = campaignAccounts.filter((account) => account.reason === 'Campaign already sent').length;
+  const remainingAccounts = Math.max(0, (campaignSummary?.totalEligible || 0) - alreadyContacted - (campaignSummary?.sent || 0));
 
   // ---------------------------------------------------------
   // SEARCH / FILTER / SORT
@@ -561,7 +598,7 @@ const Customers = () => {
       {/* --------------------------------------------------- */}
       {/* RETENTION CAMPAIGN BANNER                           */}
       {/* --------------------------------------------------- */}
-      {highRisk > 0 && (
+      <>
         <div className="p-4 rounded-2xl bg-gradient-to-r from-rose-50 via-white to-indigo-50 border border-rose-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm animate-fade-in">
           <div className="flex items-center gap-3.5">
             <div className="p-2.5 rounded-xl bg-rose-100 text-rose-600 border border-rose-200 flex-shrink-0">
@@ -571,7 +608,7 @@ const Customers = () => {
             <div>
               <div className="flex items-center gap-2">
                 <h4 className="text-sm font-semibold text-slate-900">
-                  Autonomous Win-Back Agent Standing By
+                  {highRisk > 0 ? 'Autonomous Win-Back Agent Standing By' : 'Autonomous Win-Back Agent'}
                 </h4>
 
                 <span className="text-[11px] bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full font-bold border border-rose-200">
@@ -579,16 +616,17 @@ const Customers = () => {
                 </span>
               </div>
 
-              <p className="text-xs text-slate-500 mt-0.5">
-                The AI Agent can formulate and dispatch tailored
-                incentive emails to flagged high churn accounts.
+                <p className="text-xs text-slate-500 mt-0.5">
+                {highRisk > 0
+                  ? 'Personalized retention messages will be generated for flagged high churn accounts and sent through the configured email service after confirmation.'
+                  : 'No customer accounts currently meet the 70% churn-risk threshold.'}
               </p>
             </div>
           </div>
 
           <button
             onClick={handleBatchRetentionCampaign}
-            disabled={batchCampaignMutation.isPending}
+            disabled={batchCampaignMutation.isPending || highRisk === 0}
             className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-rose-500 to-indigo-600 hover:from-rose-600 hover:to-indigo-700 text-white text-xs font-semibold shadow-lg shadow-rose-500/20 flex items-center justify-center gap-2 transition-all flex-shrink-0 disabled:opacity-60"
           >
             <Send
@@ -601,10 +639,110 @@ const Customers = () => {
 
             <span>
               {batchCampaignMutation.isPending
-                ? 'Dispatching Campaign...'
+                ? 'Running Campaign...'
                 : 'Launch AI Retention Campaign'}
             </span>
           </button>
+        </div>
+
+        {campaignSummary && campaignPhase === 'completed' && (
+          <>
+            <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+              <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-5">
+                <div><p className="text-xs text-slate-500">Eligible</p><strong>{campaignSummary.totalEligible || 0}</strong></div>
+                <div><p className="text-xs text-slate-500">Already contacted</p><strong>{alreadyContacted}</strong></div>
+                <div><p className="text-xs text-slate-500">Remaining</p><strong>{remainingAccounts}</strong></div>
+                <div><p className="text-xs text-slate-500">Sent this run</p><strong className="text-emerald-700">{campaignSummary.sent || 0}</strong></div>
+                <div><p className="text-xs text-slate-500">Failed / skipped</p><strong className="text-rose-700">{(campaignSummary.failed || 0) + (campaignSummary.skipped || 0)}</strong></div>
+              </div>
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-emerald-200 pt-3">
+                <p className="text-xs text-slate-600">Campaign processing details remain available below.</p>
+                <button type="button" onClick={() => setShowCampaignAccounts((visible) => !visible)} className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-800 transition-colors hover:bg-emerald-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/30">
+                  {showCampaignAccounts ? 'Hide account details' : `View all accounts (${campaignAccounts.length})`}
+                  {showCampaignAccounts ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                </button>
+              </div>
+            </div>
+
+            {showCampaignAccounts && (
+              <div className="mt-3 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-4 py-3">
+                  <div>
+                    <h4 className="text-sm font-semibold text-slate-900">Campaign account details</h4>
+                    <p className="text-xs text-slate-500">{campaignAccounts.length} accounts included in the campaign response.</p>
+                  </div>
+                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">Page {campaignAccountsPage} of {campaignAccountsTotalPages}</span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[680px] text-xs">
+                    <thead className="bg-slate-50 text-left uppercase tracking-wider text-slate-500">
+                      <tr>
+                        <th className="px-4 py-3 font-semibold">Customer</th>
+                        <th className="px-4 py-3 font-semibold">Churn risk</th>
+                        <th className="px-4 py-3 font-semibold">Segment</th>
+                        <th className="px-4 py-3 text-right font-semibold">LTV</th>
+                        <th className="px-4 py-3 text-right font-semibold">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {visibleCampaignAccounts.map((account) => {
+                        const status = account.status || 'unknown';
+                        const statusStyles = status === 'sent' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : status === 'skipped' ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-rose-100 text-rose-700 border-rose-200';
+                        return (
+                          <tr key={String(account.id)} className="hover:bg-slate-50">
+                            <td className="px-4 py-3"><p className="font-semibold text-slate-900">{account.name || 'Unknown customer'}</p><p className="mt-0.5 text-slate-500">{account.email || 'No email address'}</p></td>
+                            <td className="px-4 py-3 font-semibold text-rose-700">{account.churnRisk ?? '—'}%</td>
+                            <td className="px-4 py-3 text-slate-600">{account.segment || '—'}</td>
+                            <td className="px-4 py-3 text-right font-semibold text-slate-900">{account.ltv == null ? '—' : `₹${Number(account.ltv).toLocaleString()}`}</td>
+                            <td className="px-4 py-3 text-right"><span className={`inline-flex rounded-full border px-2.5 py-1 font-semibold capitalize ${statusStyles}`}>{status}</span>{account.reason && <p className="mt-1 max-w-40 text-right text-[11px] text-slate-400">{account.reason}</p>}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                {campaignAccountsTotalPages > 1 && (
+                  <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3">
+                    <button type="button" onClick={() => setCampaignAccountsPage((page) => Math.max(1, page - 1))} disabled={campaignAccountsPage === 1} className="btn-secondary px-3 py-1.5 text-xs">Previous</button>
+                    <span className="text-xs text-slate-500">{campaignAccountsPage} / {campaignAccountsTotalPages}</span>
+                    <button type="button" onClick={() => setCampaignAccountsPage((page) => Math.min(campaignAccountsTotalPages, page + 1))} disabled={campaignAccountsPage === campaignAccountsTotalPages} className="btn-secondary px-3 py-1.5 text-xs">Next</button>
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        )}
+      </>
+
+      {campaignReviewOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">Review retention campaign</h3>
+                <p className="mt-1 text-sm text-slate-500">The campaign will target {highRisk} account{highRisk === 1 ? '' : 's'} with churn risk at or above 70%.</p>
+              </div>
+              <button type="button" onClick={() => setCampaignReviewOpen(false)} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="mt-5 rounded-xl border border-brand-200 bg-brand-50 p-4 text-sm text-brand-800">
+              Personalized retention messages will use the available customer and business context. Emails will be dispatched only after you confirm.
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button type="button" onClick={() => setCampaignReviewOpen(false)} className="btn-secondary text-sm">Cancel</button>
+              <button type="button" onClick={confirmBatchRetentionCampaign} className="btn-primary flex items-center gap-2 text-sm" disabled={batchCampaignMutation.isPending}>
+                <Send className="h-4 w-4" /> Confirm and launch
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {batchCampaignMutation.isPending && (
+        <div className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-800">
+          {campaignPhase === 'preparing' && 'Preparing campaign...'}
+          {campaignPhase === 'generating' && 'Generating personalized messages and sending emails...'}
         </div>
       )}
 

@@ -34,27 +34,6 @@ const Inventory = () => {
     const query = search.trim().toLowerCase();
     return matchesStatus && (!query || item.name.toLowerCase().includes(query) || item.sku.toLowerCase().includes(query) || item.category.toLowerCase().includes(query));
   });
-  useEffect(() => {
-    inventoryService.getInventory().then((res) => {
-      if (res.success) {
-        setInventory(res.data);
-        setFiltered(res.data);
-      }
-      setLoading(false);
-    });
-  }, []);
-
-  useEffect(() => {
-    let result = inventory;
-    if (statusFilter !== 'All') result = result.filter((i) => i.status === statusFilter);
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      result = result.filter((i) =>
-        i.name.toLowerCase().includes(q) || i.sku.toLowerCase().includes(q) || i.category.toLowerCase().includes(q)
-      );
-    }
-    setFiltered(result);
-  }, [search, statusFilter, inventory]);
 
   const showToast = (msg) => {
     setToastMsg(msg);
@@ -63,9 +42,14 @@ const Inventory = () => {
 
   const handleRestock = async (id, name) => {
     setRestockingId(id);
-    const res = await inventoryService.restockItem(id);
-    setRestockingId(null);
-    if (res.success) showToast(`✅ Restock order created for "${name}"`);
+    try {
+      const res = await inventoryService.restockItem(id);
+      if (res.success) showToast(`✅ Restock order created for "${name}"`);
+    } catch (error) {
+      showToast(error.response?.data?.message || 'Unable to create restock order.');
+    } finally {
+      setRestockingId(null);
+    }
   };
 
   const handleSort = (key) => {

@@ -248,10 +248,10 @@ const Dashboard = () => {
         < div className="glass-card p-6 lg:col-span-2 flex flex-col" >
           <div className="flex justify-between items-center mb-6">
             <div>
-              <h2 className="text-lg font-semibold text-white">Revenue Overview</h2>
+              <h2 className="text-lg font-semibold text-slate-900">Revenue Overview</h2>
               <p className="text-xs text-slate-500 mt-0.5">Last 7 days</p>
             </div>
-            <span className="text-xs font-semibold px-2 py-1 rounded-lg text-emerald-400 bg-emerald-400/10">+12.5% this week</span>
+            <span className="text-xs font-semibold px-2 py-1 rounded-lg text-emerald-700 bg-emerald-100">+12.5% this week</span>
           </div >
           <div className="flex-1" style={{ minHeight: '280px' }}>
             <ResponsiveContainer width="100%" height="100%">

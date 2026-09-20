@@ -105,3 +105,33 @@ exports.getMe = async (req, res, next) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
+// @desc    Check whether a user exists
+// @route   GET /api/auth/check-user?email=...
+// @access  Public
+exports.checkUser = async (req, res) => {
+  try {
+    const { email } = req.query;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email is required'
+      });
+    }
+
+    const user = await User.findOne({ email })
+      .select('_id name email role business');
+
+    res.json({
+      success: true,
+      exists: !!user,
+      user: user || null
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: err.message
+    });
+  }
+};

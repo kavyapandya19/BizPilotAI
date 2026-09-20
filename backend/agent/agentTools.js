@@ -43,15 +43,9 @@ const agentTools = {
     console.log(`[AI Agent] Dispatching Personalized Retention Email to ${customerName} (${email}) | Churn Risk: ${churnScore}%`);
     const Customer = require('../models/Customer');
 
-    const defaultIncentive = segment === 'Enterprise'
-      ? 'VIP-ENTERPRISE-20'
-      : segment === 'Premium'
-        ? 'VIP-SAVE15'
-        : 'COMEBACK500';
-
-    const selectedIncentive = incentive || defaultIncentive;
+    const selectedIncentive = incentive || null;
     const emailSubject = subject || `Special Appreciation Offer for ${customerName} from BizPilot`;
-    const emailBody = body || `Dear ${customerName},\n\nWe noticed you haven't placed an order recently. As a valued ${segment} customer, we'd love to welcome you back with code ${selectedIncentive}.\n\nBest regards,\nBizPilot Team`;
+    const emailBody = body || `Dear ${customerName},\n\nWe would value the opportunity to understand how we can better support your ${segment} account. Please reply to this message so our customer success team can help.\n\nBest regards,\nBizPilot Team`;
 
     // Dispatch event to n8n Webhook Workflow Engine
     const n8nService = require('../services/n8nService');
@@ -69,6 +63,14 @@ const agentTools = {
         incentive: selectedIncentive,
       },
     });
+
+    if (!n8nResult.success) {
+      return {
+        success: false,
+        message: n8nResult.message || 'Email service failed. No email was sent.',
+        delivery: n8nResult,
+      };
+    }
 
     let updateResult = null;
     if (customerId) {

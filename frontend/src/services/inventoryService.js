@@ -7,6 +7,7 @@ export const inventoryService = {
   },
 
   restockItem: async (id) => {
-    throw new Error(`Restock endpoint is not available in the backend for inventory item ${id}.`);
+    const response = await api.post(`/inventory/${id}/restock`);
+    return response.data;
   },
 };

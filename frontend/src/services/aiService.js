@@ -186,25 +186,13 @@ export const aiService = {
   generateWinBackEmail: async (customer) => {
     const firstName = customer.name ? customer.name.split(' ')[0] : 'Valued Customer';
     const segment = customer.segment || 'Standard';
-    const churnRisk = customer.churnRisk || 75;
+    const churnRisk = customer.churnRisk || 0;
     const ltv = customer.ltv ? `₹${Math.round(customer.ltv).toLocaleString()}` : '₹0';
-    const recencyDays = customer.recency_days || 45;
-    const orders = customer.orders || 1;
+    const recencyDays = customer.recency_days;
+    const orders = customer.orders;
     const riskDrivers = customer.riskFactors && customer.riskFactors.length > 0
       ? customer.riskFactors.join(', ')
-      : 'Inactivity interval and reduced reorder velocity';
-
-    const incentiveCode = segment === 'Enterprise'
-      ? 'VIP-ENTERPRISE-20'
-      : segment === 'Premium'
-      ? 'VIP-SAVE15'
-      : 'COMEBACK500';
-
-    const incentiveDesc = segment === 'Enterprise'
-      ? '20% Executive Loyalty Renewal Credit + Dedicated Account Review'
-      : segment === 'Premium'
-      ? '15% VIP Replenishment Discount on any cart'
-      : '₹500 Welcome-Back Voucher on your next restock';
+      : 'Current engagement indicators';
 
     // Try generating with Gemini first
     if (API_KEY) {
@@ -218,16 +206,15 @@ Customer Churn Profile:
 - Name: ${customer.name}
 - Segment Tier: ${segment}
 - Churn Risk Score: ${churnRisk}% (RandomForest Machine Learning Assessment)
-- Inactivity: ${recencyDays} days since last purchase
-- Lifetime Value (LTV): ${ltv} (${orders} total orders)
+- Inactivity: ${recencyDays ?? 'not available'} days since last purchase
+- Lifetime Value (LTV): ${ltv} (${orders ?? 'not available'} total orders)
 - Model Risk Drivers: ${riskDrivers}
-- Assigned Incentive: ${incentiveDesc} (Code: ${incentiveCode})
 
 Guidelines:
 1. Provide a professional, warm, and compelling Subject line.
 2. Address them as ${firstName}.
-3. Acknowledge their past loyalty and order history tastefully without sounding robotic.
-4. Reference the special ${incentiveDesc} prominently with coupon code ${incentiveCode}.
+3. Use only the supplied facts and do not invent discounts, vouchers, coupon codes, products, dates, or order history.
+4. Ask the customer to reply so the customer success team can discuss a plan tailored to their needs.
 5. Conclude with a clear call-to-action and contact signature from "Customer Success Team | BizPilot AI".
 
 Format output strictly as JSON with keys "subject" and "body".`;
@@ -241,8 +228,8 @@ Format output strictly as JSON with keys "subject" and "body".`;
             success: true,
             subject: parsed.subject,
             body: parsed.body,
-            incentiveCode,
-            incentiveDesc,
+            incentiveCode: null,
+            incentiveDesc: null,
             aiGenerated: true,
           };
         }
@@ -251,26 +238,16 @@ Format output strictly as JSON with keys "subject" and "body".`;
       }
     }
 
-    // High-quality contextual profile fallback
-    const fallbackSubject = segment === 'Enterprise'
-      ? `Exclusive 20% Partnership Loyalty Credit for ${customer.name} — BizPilot Priority`
-      : segment === 'Premium'
-      ? `We miss you, ${firstName}! Here is 15% off your next restock`
-      : `Special ₹500 Welcome-Back Credit for ${customer.name}`;
+    // Safe local fallback using only facts already present on the customer record.
+    const fallbackSubject = `A personal note from BizPilot AI`;
 
     const fallbackBody = `Dear ${firstName},
 
-We noticed that it has been over ${recencyDays} days since your last order with BizPilot. Across your ${orders} previous order${orders > 1 ? 's' : ''}, your total business value has reached ${ltv}, and your account is deeply appreciated.
+We are reaching out because your ${segment} account currently has a churn-risk score of ${churnRisk}% and a recorded lifetime value of ${ltv}${recencyDays == null ? '' : ` with ${recencyDays} days since the last recorded activity`}.
 
-Our autonomous account monitor detected recent dormancy in your ordering cycle (${riskDrivers}). To ensure you have seamless access to our inventory and best pricing:
+We would value the opportunity to understand what would make BizPilot AI more useful for you. Please reply to this message so our customer success team can help with a plan tailored to your needs.
 
-🎁 We have activated an exclusive retention credit for your ${segment} account:
-${incentiveDesc}
-Promo Code: ${incentiveCode} (Valid for the next 14 days)
-
-Whether you need expedited bulk shipping or custom product quantities, our support desk is ready to prioritize your request.
-
-You can claim this directly on your dashboard or reply to this message to coordinate with an account representative.
+Current risk factors: ${riskDrivers}.
 
 Warm regards,
 Customer Success Operations
@@ -280,8 +257,8 @@ BizPilot AI Autonomous Platform`;
       success: true,
       subject: fallbackSubject,
       body: fallbackBody,
-      incentiveCode,
-      incentiveDesc,
+      incentiveCode: null,
+      incentiveDesc: null,
       aiGenerated: false,
     };
   },

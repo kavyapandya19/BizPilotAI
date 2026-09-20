@@ -16,6 +16,15 @@ class N8nService {
    * Dispatch customer churn retention event to n8n webhook workflow
    */
   async triggerChurnEmailWebhook({ customer, campaign }) {
+    if (!process.env.N8N_CHURN_WEBHOOK_URL) {
+      return {
+        success: false,
+        deliveredVia: 'n8n_webhook',
+        n8nStatus: 'not_configured',
+        message: 'Email service is not configured. Set N8N_CHURN_WEBHOOK_URL to enable delivery.',
+      };
+    }
+
     const url = this.getWebhookUrl();
     const payload = {
       event: 'customer.churn_risk_high',
@@ -35,8 +44,8 @@ class N8nService {
       campaign: {
         subject: campaign.subject,
         body: campaign.body,
-        incentiveCode: campaign.incentive,
-        incentiveDesc: campaign.incentiveDesc || (customer.segment === 'Enterprise' ? '20% Executive Credit' : customer.segment === 'Premium' ? '15% VIP Discount' : '₹500 Voucher'),
+        incentiveCode: campaign.incentive || null,
+        incentiveDesc: campaign.incentiveDesc || null,
         channel: 'email',
       },
     };
@@ -61,13 +70,12 @@ class N8nService {
         data: response.data,
       };
     } catch (err) {
-      console.warn(`[n8nService] n8n instance at ${url} not reachable (${err.message}). Staging webhook payload in BizPilot event logger.`);
+      console.warn(`[n8nService] n8n instance at ${url} not reachable (${err.message}).`);
       return {
-        success: true,
-        deliveredVia: 'n8n_staged_logger',
+        success: false,
+        deliveredVia: 'n8n_webhook',
         n8nStatus: 'offline_fallback',
-        message: 'Payload staged for n8n; dispatched via BizPilot direct email agent',
-        stagedPayload: payload,
+        message: 'Email service could not be reached. No email was sent.',
       };
     }
   }

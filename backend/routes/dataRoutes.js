@@ -4,6 +4,8 @@ const Product = require('../models/Product');
 const Customer = require('../models/Customer');
 const Inventory = require('../models/Inventory');
 const Sale = require('../models/Sale');
+const { protect } = require('../middleware/authMiddleware');
+const { generateRetentionMessage } = require('../services/retentionCampaignService');
 
 // @desc Get all inventory items with product details
 // @route GET /api/inventory
@@ -31,6 +33,33 @@ router.get('/inventory', async (req, res) => {
       success: true,
       count: formatted.length,
       data: formatted,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// @desc Restock an inventory item
+// @route POST /api/inventory/:id/restock
+// @access Private
+router.post('/inventory/:id/restock', protect, async (req, res) => {
+  try {
+    const inventoryItem = await Inventory.findOne({
+      _id: req.params.id,
+      business: req.user.business._id,
+    });
+
+    if (!inventoryItem) {
+      return res.status(404).json({ success: false, message: 'Inventory item not found' });
+    }
+
+    inventoryItem.lastRestocked = new Date();
+    await inventoryItem.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Restock order created successfully.',
+      data: inventoryItem,
     });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -222,9 +251,12 @@ router.get('/dashboard/kpis', async (req, res) => {
 
 // @desc Dispatch personalized AI retention email to customer
 // @route POST /api/customers/:id/retention-email
-router.post('/customers/:id/retention-email', async (req, res) => {
+router.post('/customers/:id/retention-email', protect, async (req, res) => {
   try {
-    const customer = await Customer.findById(req.params.id);
+    const customer = await Customer.findOne({
+      _id: req.params.id,
+      business: req.user.business._id,
+    });
     if (!customer) {
       return res.status(404).json({ success: false, message: 'Customer not found' });
     }
@@ -241,6 +273,14 @@ router.post('/customers/:id/retention-email', async (req, res) => {
       incentive,
     });
 
+    if (!result.success) {
+      return res.status(502).json({
+        success: false,
+        message: result.message || 'Email service failed. No email was sent.',
+        data: result,
+      });
+    }
+
     res.status(200).json({
       success: true,
       message: `Personalized retention email dispatched to ${customer.email}`,
@@ -253,40 +293,86 @@ router.post('/customers/:id/retention-email', async (req, res) => {
 
 // @desc Autonomous AI Agent batch retention campaign for all high churn customers
 // @route POST /api/customers/campaign/batch-retention-emails
-router.post('/customers/campaign/batch-retention-emails', async (req, res) => {
+router.post('/customers/campaign/batch-retention-emails', protect, async (req, res) => {
   try {
     const threshold = parseFloat(req.query.threshold) || 70.0;
-    const highRiskCustomers = await Customer.find({ churnRisk: { $gte: threshold } }).lean();
-
-    const dispatchResults = [];
-    for (const cust of highRiskCustomers) {
-      const incentive = cust.segment === 'Enterprise'
-        ? 'VIP-ENTERPRISE-20'
-        : cust.segment === 'Premium'
-        ? 'VIP-SAVE15'
-        : 'COMEBACK500';
-
-      const subject = `Exclusive ${cust.segment} Incentive from BizPilot for ${cust.name}`;
-      const body = `Hello ${cust.name},\n\nWe noticed your account has been inactive. As a valued ${cust.segment} customer, we'd like to extend an exclusive comeback incentive of 15-20% with code ${incentive}.\n\nBest regards,\nBizPilot AI Autonomous Retention Agent`;
-
-      const result = await agentTools.sendRetentionEmail({
-        customerId: cust._id,
-        customerName: cust.name,
-        email: cust.email,
-        segment: cust.segment,
-        churnScore: cust.churnRisk,
-        subject,
-        body,
-        incentive,
+    if (!process.env.N8N_CHURN_WEBHOOK_URL) {
+      return res.status(503).json({
+        success: false,
+        message: 'Email service is not configured. Set N8N_CHURN_WEBHOOK_URL before launching a campaign.',
       });
-      dispatchResults.push(result);
+    }
+
+    const businessId = req.user.business?._id;
+    if (!businessId) {
+      return res.status(403).json({ success: false, message: 'Authenticated user has no business context' });
+    }
+
+    const highRiskCustomers = await Customer.find({
+      business: businessId,
+      churnRisk: { $gte: threshold },
+    }).lean();
+
+    const results = [];
+    let generated = 0;
+    let sent = 0;
+    let failed = 0;
+    let skipped = 0;
+
+    for (const cust of highRiskCustomers) {
+      if (!cust.email) {
+        skipped += 1;
+        results.push({ id: cust._id, name: cust.name, status: 'skipped', reason: 'No email address' });
+        continue;
+      }
+
+      if (cust.retentionCampaign?.status === 'Sent') {
+        skipped += 1;
+        results.push({ id: cust._id, name: cust.name, email: cust.email, status: 'skipped', reason: 'Campaign already sent' });
+        continue;
+      }
+
+      try {
+        const message = await generateRetentionMessage(cust, req.user.business.name);
+        generated += 1;
+
+        const result = await agentTools.sendRetentionEmail({
+          customerId: cust._id,
+          customerName: cust.name,
+          email: cust.email,
+          segment: cust.segment || 'Standard',
+          churnScore: cust.churnRisk,
+          subject: message.subject,
+          body: message.body,
+          incentive: message.incentive,
+        });
+
+        if (result.success) {
+          sent += 1;
+          results.push({ id: cust._id, name: cust.name, email: cust.email, status: 'sent', aiGenerated: message.aiGenerated });
+        } else {
+          failed += 1;
+          results.push({ id: cust._id, name: cust.name, email: cust.email, status: 'failed', reason: result.message, aiGenerated: message.aiGenerated });
+        }
+      } catch (error) {
+        failed += 1;
+        results.push({ id: cust._id, name: cust.name, email: cust.email, status: 'failed', reason: error.message });
+      }
     }
 
     res.status(200).json({
       success: true,
-      count: dispatchResults.length,
-      message: `Autonomous AI retention campaign completed! Dispatched ${dispatchResults.length} retention emails.`,
-      data: dispatchResults,
+      count: sent,
+      message: `Autonomous retention campaign completed. Sent ${sent} of ${highRiskCustomers.length} eligible accounts.`,
+      data: {
+        threshold,
+        totalEligible: highRiskCustomers.length,
+        generated,
+        sent,
+        failed,
+        skipped,
+        results,
+      },
     });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

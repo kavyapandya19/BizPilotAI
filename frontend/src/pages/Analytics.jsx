@@ -1,8 +1,63 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  CartesianGrid,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Legend,
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+} from 'recharts';
 import { TrendingUp, ShoppingBag, DollarSign, BarChart2 } from 'lucide-react';
 import { dashboardService } from '../services/dashboardService';
 import LoadingScreen from '../components/common/LoadingScreen';
+
+const revenueData = [
+  { date: 'Sep 14', revenue: 3200, orders: 28 },
+  { date: 'Sep 15', revenue: 4100, orders: 35 },
+  { date: 'Sep 16', revenue: 3800, orders: 31 },
+  { date: 'Sep 17', revenue: 5200, orders: 44 },
+  { date: 'Sep 18', revenue: 4700, orders: 39 },
+  { date: 'Sep 19', revenue: 6100, orders: 52 },
+  { date: 'Sep 20', revenue: 5800, orders: 48 },
+];
+
+const channelData = [
+  { name: 'Online', value: 52, color: '#0ea5e9' },
+  { name: 'In-Store', value: 23, color: '#818cf8' },
+  { name: 'B2B', value: 18, color: '#34d399' },
+  { name: 'Other', value: 7, color: '#fb923c' },
+];
+
+const topProducts = [
+  { name: 'Pro Headphones X1', revenue: 18400, units: 184 },
+  { name: 'Smart Watch S3', revenue: 15200, units: 76 },
+  { name: 'Laptop Stand Pro', revenue: 11900, units: 238 },
+  { name: 'Mechanical Keyboard', revenue: 9800, units: 98 },
+  { name: 'USB-C Hub 7-in-1', revenue: 7600, units: 380 },
+];
+
+const CustomTooltip = ({ active, payload, label }) => {
+  if (!active || !payload || !payload.length) return null;
+
+  return (
+    <div className="bg-white px-4 py-3 rounded-xl text-sm shadow-lg border border-slate-200">
+      <p className="text-slate-500 mb-1">{label}</p>
+      {payload.map((item, index) => (
+        <p key={index} style={{ color: item.color }} className="font-semibold">
+          {item.name === 'revenue' ? `₹${item.value.toLocaleString()}` : `${item.value} orders`}
+        </p>
+      ))}
+    </div>
+  );
+};
 
 const Analytics = () => {
   const kpiQuery = useQuery({
@@ -62,7 +117,7 @@ const Analytics = () => {
 
       {/* Revenue Chart */}
       <div className="glass-card p-6">
-        <h2 className="text-lg font-semibold text-white mb-6">Revenue & Orders Over Time</h2>
+        <h2 className="text-lg font-semibold text-slate-900 mb-6">Revenue & Orders Over Time</h2>
         <ResponsiveContainer width="100%" height={300}>
           <AreaChart data={revenueData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
             <defs>
@@ -90,7 +145,7 @@ const Analytics = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Sales by Channel */}
         <div className="glass-card p-6">
-          <h2 className="text-lg font-semibold text-white mb-6">Sales by Channel</h2>
+          <h2 className="text-lg font-semibold text-slate-900 mb-6">Sales by Channel</h2>
           <div className="flex items-center gap-6">
             <ResponsiveContainer width="50%" height={200}>
               <PieChart>
@@ -107,9 +162,9 @@ const Analytics = () => {
                 <div key={item.name} className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div className="w-3 h-3 rounded-full" style={{ background: item.color }} />
-                    <span className="text-sm text-slate-400">{item.name}</span>
+                    <span className="text-sm text-slate-600">{item.name}</span>
                   </div>
-                  <span className="text-sm font-semibold text-white">{item.value}%</span>
+                  <span className="text-sm font-semibold text-slate-900">{item.value}%</span>
                 </div>
               ))}
             </div>
@@ -118,7 +173,7 @@ const Analytics = () => {
 
         {/* Top Products */}
         <div className="glass-card p-6">
-          <h2 className="text-lg font-semibold text-white mb-6">Top Products by Revenue</h2>
+          <h2 className="text-lg font-semibold text-slate-900 mb-6">Top Products by Revenue</h2>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={topProducts} layout="vertical" margin={{ top: 0, right: 10, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" horizontal={false} />

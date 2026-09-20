@@ -976,11 +976,11 @@ const Settings = () => {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-white">
+        <h1 className="text-2xl font-bold text-slate-900">
           Settings
         </h1>
 
-        <p className="text-slate-400 mt-1">
+        <p className="text-slate-500 mt-1">
           Manage your account, business, and preferences.
         </p>
       </div>
@@ -999,8 +999,8 @@ const Settings = () => {
                   onClick={() => setActiveTab(tab.id)}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
                     activeTab === tab.id
-                      ? 'bg-brand-500/10 text-brand-400 border border-brand-500/20'
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                      ? 'bg-brand-50 text-brand-700 border border-brand-200'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                   }`}
                 >
                   <Icon className="w-4 h-4" />
@@ -1013,7 +1013,7 @@ const Settings = () => {
 
         {/* Content panel */}
         <div className="lg:col-span-3 glass-card p-6">
-          <h2 className="text-lg font-semibold text-white mb-6 pb-4 border-b border-slate-700/50">
+          <h2 className="text-lg font-semibold text-slate-900 mb-6 pb-4 border-b border-slate-200">
             {TABS.find((tab) => tab.id === activeTab)?.label} Settings
           </h2>
 
