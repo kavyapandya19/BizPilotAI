@@ -48,7 +48,7 @@ const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload || !payload.length) return null;
 
   return (
-    <div className="bg-white px-4 py-3 rounded-xl text-sm shadow-lg border border-slate-200">
+    <div className="glass-panel px-4 py-3 rounded-xl text-sm shadow-lg">
       <p className="text-slate-500 mb-1">{label}</p>
       {payload.map((item, index) => (
         <p key={index} style={{ color: item.color }} className="font-semibold">
@@ -122,20 +122,20 @@ const Analytics = () => {
           <AreaChart data={revenueData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
             <defs>
               <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0} />
+                <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.3} />
+                <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
               </linearGradient>
               <linearGradient id="colorOrders" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#818cf8" stopOpacity={0.3} />
                 <stop offset="95%" stopColor="#818cf8" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-            <XAxis dataKey="date" tick={{ fill: '#94a3b8', fontSize: 12 }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fill: '#94a3b8', fontSize: 12 }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${(v/1000).toFixed(0)}k`} />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+            <XAxis dataKey="date" tick={{ fill: 'var(--text-muted)', fontSize: 12 }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 12 }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${(v/1000).toFixed(0)}k`} />
             <Tooltip content={<CustomTooltip />} />
-            <Legend wrapperStyle={{ color: '#94a3b8', fontSize: '12px' }} />
-            <Area type="monotone" dataKey="revenue" name="revenue" stroke="#0ea5e9" strokeWidth={2} fill="url(#colorRevenue)" dot={false} activeDot={{ r: 6, fill: '#0ea5e9' }} />
+            <Legend wrapperStyle={{ color: 'var(--text-muted)', fontSize: '12px' }} />
+            <Area type="monotone" dataKey="revenue" name="revenue" stroke="var(--primary)" strokeWidth={2} fill="url(#colorRevenue)" dot={false} activeDot={{ r: 6, fill: 'var(--primary)' }} />
             <Area type="monotone" dataKey="orders" name="orders" stroke="#818cf8" strokeWidth={2} fill="url(#colorOrders)" dot={false} activeDot={{ r: 6, fill: '#818cf8' }} />
           </AreaChart>
         </ResponsiveContainer>
@@ -154,7 +154,7 @@ const Analytics = () => {
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(v) => `${v}%`} contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '12px' }} />
+                <Tooltip formatter={(v) => `${v}%`} contentStyle={{ background: 'var(--surface-elevated)', border: '1px solid var(--border)', borderRadius: '12px', color: 'var(--text-primary)' }} />
               </PieChart>
             </ResponsiveContainer>
             <div className="flex-1 space-y-3">
@@ -176,11 +176,11 @@ const Analytics = () => {
           <h2 className="text-lg font-semibold text-slate-900 mb-6">Top Products by Revenue</h2>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={topProducts} layout="vertical" margin={{ top: 0, right: 10, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" horizontal={false} />
-              <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${(v/1000).toFixed(0)}k`} />
-              <YAxis type="category" dataKey="name" tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} width={120} />
-              <Tooltip formatter={(v) => `₹${v.toLocaleString()}`} contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '12px' }} />
-              <Bar dataKey="revenue" fill="#0ea5e9" radius={[0, 6, 6, 0]} />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
+              <XAxis type="number" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${(v/1000).toFixed(0)}k`} />
+              <YAxis type="category" dataKey="name" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} axisLine={false} tickLine={false} width={120} />
+              <Tooltip formatter={(v) => `₹${v.toLocaleString()}`} contentStyle={{ background: 'var(--surface-elevated)', border: '1px solid var(--border)', borderRadius: '12px', color: 'var(--text-primary)' }} />
+              <Bar dataKey="revenue" fill="var(--primary)" radius={[0, 6, 6, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>

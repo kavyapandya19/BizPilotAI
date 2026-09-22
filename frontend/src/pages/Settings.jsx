@@ -973,7 +973,7 @@ const Settings = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="settings-page space-y-6">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-slate-900">

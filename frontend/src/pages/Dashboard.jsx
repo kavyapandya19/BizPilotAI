@@ -1,15 +1,26 @@
-import React, { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { ArrowUpRight, ArrowDownRight, DollarSign, Users, ShoppingCart, Activity, Download, CheckCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { ArrowUpRight, ArrowDownRight, DollarSign, Users, ShoppingCart, Activity, Download, CheckCircle, X, Trash2 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { dashboardService } from '../services/dashboardService';
 import { inventoryService } from '../services/inventoryService';
 import { customerService } from '../services/customerService';
 import LoadingScreen from '../components/common/LoadingScreen';
 
+const renderInsightLine = (line) => {
+  const parts = line.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((part, index) => (
+    part.startsWith('**') && part.endsWith('**')
+      ? <strong key={index} className="font-semibold text-slate-900">{part.slice(2, -2)}</strong>
+      : <span key={index}>{part}</span>
+  ));
+};
+
 const Dashboard = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [toastMsg, setToastMsg] = useState('');
+  const [selectedInsight, setSelectedInsight] = useState(null);
+  const queryClient = useQueryClient();
   const kpiQuery = useQuery({
     queryKey: ['dashboard', 'kpis'],
     queryFn: dashboardService.getKPIs,
@@ -25,8 +36,13 @@ const Dashboard = () => {
     queryFn: customerService.getCustomers,
     staleTime: 2 * 60 * 1000,
   });
+  const insightsQuery = useQuery({
+    queryKey: ['ai-insights'],
+    queryFn: dashboardService.getAIInsights,
+    staleTime: 30 * 1000,
+  });
   const kpis = kpiQuery.data?.data || [];
-  const insights = [];
+  const insights = insightsQuery.data?.data || [];
 
   const REVENUE_SPARKLINE = [
     { date: 'Sep 14', revenue: 3200 },
@@ -41,8 +57,8 @@ const Dashboard = () => {
   const ChartTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-slate-800 border border-slate-700 px-3 py-2 rounded-xl text-xs">
-          <p className="text-slate-400 mb-0.5">{label}</p>
+        <div className="glass-panel px-3 py-2 rounded-xl text-xs">
+          <p className="text-slate-500 mb-0.5">{label}</p>
           <p className="text-brand-400 font-bold">₹{payload[0].value.toLocaleString()}</p>
         </div>
       );
@@ -53,6 +69,26 @@ const Dashboard = () => {
   const showToast = (msg) => {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(''), 3500);
+  };
+
+  const deleteInsight = async (event, insight) => {
+    event.stopPropagation();
+    const insightId = insight._id || insight.id;
+    if (!insightId) return;
+
+    try {
+      await dashboardService.deleteAIInsight(insightId);
+      queryClient.setQueryData(['ai-insights'], (current) => ({
+        ...(current || { success: true }),
+        data: (current?.data || []).filter((item) => (item._id || item.id) !== insightId),
+      }));
+      if ((selectedInsight?._id || selectedInsight?.id) === insightId) {
+        setSelectedInsight(null);
+      }
+    } catch (deleteError) {
+      showToast('Could not remove this saved insight.');
+      console.warn('[BizPilot Dashboard] Could not delete saved insight:', deleteError.message);
+    }
   };
 
   const generateReport = async () => {
@@ -134,26 +170,6 @@ const Dashboard = () => {
       showToast('❌ Failed to download report. Please try again.');
     }
   };
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [kpiRes, insightsRes] = await Promise.all([
-          dashboardService.getKPIs(),
-          dashboardService.getAgentInsights()
-        ]);
-
-        if (kpiRes.success) setKpis(kpiRes.data);
-        if (insightsRes.success) setInsights(insightsRes.data);
-      } catch (error) {
-        console.error("Failed to fetch dashboard data", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, []);
 
   const getIconForTitle = (title) => {
     if (title.includes('Revenue')) return DollarSign;
@@ -258,15 +274,15 @@ const Dashboard = () => {
               <AreaChart data={REVENUE_SPARKLINE} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
                 <defs>
                   <linearGradient id="dashRevGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0} />
+                    <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                <XAxis dataKey="date" tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis dataKey="date" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
                 <Tooltip content={<ChartTooltip />} />
-                <Area type="monotone" dataKey="revenue" stroke="#0ea5e9" strokeWidth={2} fill="url(#dashRevGrad)" dot={false} activeDot={{ r: 5, fill: '#0ea5e9' }} />
+                <Area type="monotone" dataKey="revenue" stroke="var(--primary)" strokeWidth={2} fill="url(#dashRevGrad)" dot={false} activeDot={{ r: 5, fill: 'var(--primary)' }} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -275,43 +291,102 @@ const Dashboard = () => {
         {/* AI Agent Activity */}
         < div className="glass-card p-6 flex flex-col" >
           <h2 className="text-lg font-semibold text-slate-900 mb-6">AI Agent Insights</h2>
-          <div className="flex-1 space-y-4">
+          <div className="max-h-[430px] flex-1 space-y-4 overflow-y-auto pr-2">
 
             {insights.map((insight) => (
               <div
-                key={insight.id}
-                className={`p-4 rounded-xl border ${insight.type === 'alert'
-                  ? 'bg-brand-50 border-brand-200'
-                  : 'bg-slate-50 border-slate-200'
-                  }`}
+                key={insight._id || insight.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => setSelectedInsight(insight)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    setSelectedInsight(insight);
+                  }
+                }}
+                className="relative p-4 rounded-xl border bg-brand-50 border-brand-200 cursor-pointer transition hover:border-brand-400 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
               >
                 <div className="flex items-center gap-2 mb-2">
-                  <div className={`w-2 h-2 rounded-full ${insight.type === 'alert' ? 'bg-brand-500' : 'bg-emerald-500'}`}></div>
-                  <span className={`text-sm font-medium ${insight.type === 'alert' ? 'text-brand-700' : 'text-emerald-700'}`}>
-                    {insight.title}
+                  <div className="w-2 h-2 rounded-full bg-brand-500"></div>
+                  <span className="min-w-0 flex-1 text-sm font-medium text-brand-700 truncate">
+                    {insight.question}
                   </span>
+                  <button
+                    type="button"
+                    onClick={(event) => deleteInsight(event, insight)}
+                    className="shrink-0 rounded-lg p-1.5 text-slate-400 transition hover:bg-rose-100 hover:text-rose-600"
+                    aria-label={`Remove saved insight: ${insight.question}`}
+                    title="Remove saved insight"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
                 </div>
-                <p className="text-sm text-slate-600 leading-relaxed">
-                  "{insight.message}"
+                <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-line line-clamp-5">
+                  {insight.answer}
                 </p>
-                {insight.actionText && (
-                  <div className="mt-3">
-                    <button className="text-xs bg-brand-500 text-white px-3 py-1.5 rounded-lg hover:bg-brand-600 transition">
-                      {insight.actionText}
-                    </button>
-                  </div>
-                )}
+                <p className="text-[11px] text-slate-400 mt-3">
+                  {new Date(insight.createdAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                </p>
               </div>
             ))}
 
-            {insights.length === 0 && (
-              <div className="text-slate-500 text-sm text-center py-4">No recent insights from the agent.</div>
+            {insightsQuery.isPending && (
+              <div className="text-slate-500 text-sm text-center py-4">Loading saved AI insights...</div>
+            )}
+
+            {!insightsQuery.isPending && insights.length === 0 && (
+              <div className="text-slate-500 text-sm text-center py-4">Ask the AI Assistant a question to see saved insights here.</div>
             )}
 
           </div>
         </div >
 
       </div >
+
+      {selectedInsight && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm"
+          role="presentation"
+          onClick={() => setSelectedInsight(null)}
+        >
+          <div
+            className="glass-panel w-full max-w-2xl max-h-[85vh] overflow-hidden rounded-2xl shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="insight-detail-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-brand-600">Saved AI insight</p>
+                <h2 id="insight-detail-title" className="mt-1 text-lg font-semibold text-slate-900">
+                  {selectedInsight.question}
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedInsight(null)}
+                className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+                aria-label="Close insight details"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="max-h-[calc(85vh-130px)] overflow-y-auto px-6 py-6 text-sm leading-7 text-slate-700">
+              {selectedInsight.answer.split('\n').map((line, index) => (
+                <React.Fragment key={index}>
+                  {renderInsightLine(line)}
+                  {index < selectedInsight.answer.split('\n').length - 1 && <br />}
+                </React.Fragment>
+              ))}
+            </div>
+            <div className="border-t border-slate-200 px-6 py-3 text-xs text-slate-400">
+              {new Date(selectedInsight.createdAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+            </div>
+          </div>
+        </div>
+      )}
     </div >
   );
 };

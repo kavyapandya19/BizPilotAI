@@ -37,7 +37,7 @@ You have access to the following simulated business context:
 - Revenue: This week's revenue is ₹32,900 (up 12.5% from last week). Best day: Thursday (₹6,100). Enterprise segment drives 52% of revenue. AOV is ₹103.45.
 - Customers: 3 high churn-risk customers (score >70%): Priya Sharma, Tom Bauer, Aisha Patel. Top customer David Kim (LTV ₹31,500) hasn't ordered in 6 weeks. Enterprise segment = 68% of LTV with only 25% of customer count.
 
-Respond in a helpful, concise, and professional tone. Use **bold** for key metrics and important terms. Use line breaks to separate ideas. Be proactive — suggest next steps and actions. Keep responses focused and under 200 words unless a detailed breakdown is requested.`;
+Respond in a helpful, complete, and professional tone. Use **bold** for key metrics and important terms. Use line breaks to separate ideas. Be proactive — suggest next steps and actions. Answer the full request, include relevant details from the business context, and never stop mid-sentence or omit a requested section. Prefer a structured response with a short conclusion and clear next actions.`;
 
 // Multi-turn chat state
 let chatHistory = [];
@@ -109,6 +109,16 @@ You can ask me to draft purchase orders, break down churn probabilities, or anal
 };
 
 export const aiService = {
+  loadHistory: (insights = []) => {
+    chatHistory = insights
+      .slice()
+      .sort((first, second) => new Date(first.createdAt) - new Date(second.createdAt))
+      .flatMap((insight) => [
+        { role: 'user', parts: [{ text: insight.question }] },
+        { role: 'model', parts: [{ text: insight.answer }] },
+      ]);
+  },
+
   sendMessage: async (message) => {
     let lastError = null;
 
@@ -127,13 +137,24 @@ export const aiService = {
           const chat = model.startChat({
             history: chatHistory,
             generationConfig: {
-              maxOutputTokens: 512,
+              maxOutputTokens: 1200,
               temperature: 0.7,
             },
           });
 
           const result = await chat.sendMessage(message);
-          const text = result.response.text();
+          let text = result.response.text();
+          let finishReason = result.response.candidates?.[0]?.finishReason;
+
+          // Ask for a continuation when a long answer reaches the generation cap.
+          for (let continuation = 0; continuation < 2 && finishReason === 'MAX_TOKENS'; continuation += 1) {
+            const continuationResult = await chat.sendMessage(
+              'Continue from exactly where you stopped. Do not repeat any previous text and finish the requested response completely.'
+            );
+            const continuationText = continuationResult.response.text();
+            text = `${text}\n${continuationText}`;
+            finishReason = continuationResult.response.candidates?.[0]?.finishReason;
+          }
 
           // Save successful model index and history
           activeModelIndex = (activeModelIndex + attempt) % CANDIDATE_MODELS.length;
@@ -147,6 +168,7 @@ export const aiService = {
               role: 'assistant',
               content: text,
               timestamp: new Date().toISOString(),
+              source: 'gemini',
             },
           };
         } catch (error) {
@@ -171,8 +193,31 @@ export const aiService = {
         role: 'assistant',
         content: fallbackText,
         timestamp: new Date().toISOString(),
+        source: 'fallback',
       },
     };
+  },
+
+  saveInsight: async ({ question, answer, source }) => {
+    try {
+      const response = await fetch('/api/ai-insights', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(localStorage.getItem('token')
+            ? { Authorization: `Bearer ${localStorage.getItem('token')}` }
+            : {}),
+        },
+        body: JSON.stringify({ question, answer, source }),
+      });
+
+      if (!response.ok) return null;
+      const payload = await response.json();
+      return payload.data || null;
+    } catch (error) {
+      console.warn('[BizPilot AI] Could not save insight history:', error.message);
+      return null;
+    }
   },
 
   resetChat: () => {

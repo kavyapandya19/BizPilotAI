@@ -34,13 +34,13 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 relative overflow-hidden">
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 relative overflow-hidden transition-colors duration-200">
 
       {/* Background decorations */}
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-brand-500/20 rounded-full blur-[100px] pointer-events-none"></div>
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-indigo-500/20 rounded-full blur-[100px] pointer-events-none"></div>
 
-      <div className="w-full max-w-md bg-white border border-slate-200 shadow-xl p-8 rounded-2xl z-10 relative">
+      <div className="w-full max-w-md glass-card p-8 z-10 relative">
         <div className="text-center mb-10">
           <div className="flex items-center justify-center gap-2 mb-6">
             <div className="w-16 h-16 rounded-2xl bg-brand-600 flex items-center justify-center shadow-md">

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Package, AlertTriangle, XCircle, CheckCircle, RefreshCw, ChevronUp, ChevronDown } from 'lucide-react';
 import { inventoryService } from '../services/inventoryService';
 import PaginationToolbar from '../components/common/PaginationToolbar';
@@ -17,6 +17,7 @@ const Inventory = () => {
   const [statusFilter, setStatusFilter] = useState('All');
   const [restockingId, setRestockingId] = useState(null);
   const [toastMsg, setToastMsg] = useState('');
+  const queryClient = useQueryClient();
 
   // Table State
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
@@ -44,7 +45,10 @@ const Inventory = () => {
     setRestockingId(id);
     try {
       const res = await inventoryService.restockItem(id);
-      if (res.success) showToast(`✅ Restock order created for "${name}"`);
+      if (res.success) {
+        await queryClient.invalidateQueries({ queryKey: ['inventory'] });
+        showToast(`✅ Added ${res.quantityAdded || ''} units to "${name}"`);
+      }
     } catch (error) {
       showToast(error.response?.data?.message || 'Unable to create restock order.');
     } finally {

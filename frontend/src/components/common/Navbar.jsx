@@ -21,7 +21,11 @@ import {
   ArrowRight,
   ChevronRight,
   Layers,
+  Sun,
+  Moon,
 } from 'lucide-react';
+import SearchField from './SearchField';
+import { useTheme } from '../../context/ThemeContext';
 
 const SEARCH_DATABASE = [
   { id: 'p1', title: 'Dashboard Overview', subtitle: 'Key metrics, executive KPIs, and live revenue pulse', category: 'Pages', path: '/', icon: LayoutDashboard },
@@ -34,6 +38,7 @@ const SEARCH_DATABASE = [
 
 const Navbar = () => {
   const { user, logout } = useContext(AuthContext);
+  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
 
   // Search State
@@ -182,7 +187,7 @@ const Navbar = () => {
   };
 
   return (
-    <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-6 z-20 sticky top-0">
+    <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-6 z-20 sticky top-0 transition-colors duration-200">
       {/* Global Toast */}
       {toastMsg && (
         <div className="fixed top-6 right-6 z-50 bg-white px-5 py-3 rounded-xl text-sm text-slate-800 border border-slate-200 shadow-xl animate-fade-in flex items-center gap-2">
@@ -445,6 +450,16 @@ const Navbar = () => {
             </div>
           )}
         </div>
+
+        <button
+          type="button"
+          onClick={toggleTheme}
+          className="p-2.5 rounded-xl text-slate-500 transition-all hover:bg-slate-50 hover:text-brand-600"
+          title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+          aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+        >
+          {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+        </button>
 
         <div className="h-8 w-px bg-slate-200 hidden sm:block"></div>
 

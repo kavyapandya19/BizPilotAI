@@ -4,6 +4,7 @@ const Product = require('../models/Product');
 const Customer = require('../models/Customer');
 const Inventory = require('../models/Inventory');
 const Sale = require('../models/Sale');
+const AIInsight = require('../models/AIInsight');
 const { protect } = require('../middleware/authMiddleware');
 const { generateRetentionMessage } = require('../services/retentionCampaignService');
 
@@ -53,12 +54,19 @@ router.post('/inventory/:id/restock', protect, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Inventory item not found' });
     }
 
+    const requestedQuantity = Number(req.body?.quantity);
+    const quantity = Number.isInteger(requestedQuantity) && requestedQuantity > 0
+      ? requestedQuantity
+      : Math.max(inventoryItem.reorderLevel * 2 - inventoryItem.currentStock, inventoryItem.reorderLevel, 1);
+
+    inventoryItem.currentStock += quantity;
     inventoryItem.lastRestocked = new Date();
     await inventoryItem.save();
 
     res.status(200).json({
       success: true,
-      message: 'Restock order created successfully.',
+      message: `Restocked ${quantity} units successfully.`,
+      quantityAdded: quantity,
       data: inventoryItem,
     });
   } catch (err) {
@@ -244,6 +252,80 @@ router.get('/dashboard/kpis', async (req, res) => {
         },
       ],
     });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// @desc Get recent AI assistant conversations for the dashboard
+// @route GET /api/ai-insights
+router.get('/ai-insights', protect, async (req, res) => {
+  try {
+    const businessId = req.user.business?._id;
+    if (!businessId) {
+      return res.status(403).json({ success: false, message: 'Authenticated user has no business context' });
+    }
+
+    const limit = Math.min(Math.max(Number.parseInt(req.query.limit, 10) || 12, 1), 50);
+    const insights = await AIInsight.find({ business: businessId })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean();
+
+    res.status(200).json({ success: true, count: insights.length, data: insights });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// @desc Save an AI assistant conversation for future dashboard review
+// @route POST /api/ai-insights
+router.post('/ai-insights', protect, async (req, res) => {
+  try {
+    const businessId = req.user.business?._id;
+    const question = String(req.body?.question || '').trim();
+    const answer = String(req.body?.answer || '').trim();
+
+    if (!businessId) {
+      return res.status(403).json({ success: false, message: 'Authenticated user has no business context' });
+    }
+    if (!question || !answer) {
+      return res.status(400).json({ success: false, message: 'Question and answer are required' });
+    }
+
+    const insight = await AIInsight.create({
+      business: businessId,
+      user: req.user._id,
+      question,
+      answer,
+      source: req.body?.source === 'fallback' ? 'fallback' : 'gemini',
+    });
+
+    res.status(201).json({ success: true, data: insight });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// @desc Delete one saved AI assistant conversation from dashboard history
+// @route DELETE /api/ai-insights/:id
+router.delete('/ai-insights/:id', protect, async (req, res) => {
+  try {
+    const businessId = req.user.business?._id;
+    if (!businessId) {
+      return res.status(403).json({ success: false, message: 'Authenticated user has no business context' });
+    }
+
+    const deletedInsight = await AIInsight.findOneAndDelete({
+      _id: req.params.id,
+      business: businessId,
+    });
+
+    if (!deletedInsight) {
+      return res.status(404).json({ success: false, message: 'AI insight not found' });
+    }
+
+    res.status(200).json({ success: true, data: { id: deletedInsight._id } });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

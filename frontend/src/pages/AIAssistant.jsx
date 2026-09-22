@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, BrainCircuit, User, Sparkles, ChevronRight, RotateCcw } from 'lucide-react';
 import { aiService } from '../services/aiService';
+import { dashboardService } from '../services/dashboardService';
 
 const SUGGESTED_PROMPTS = [
   'What inventory items need restocking?',
@@ -18,6 +19,8 @@ const INITIAL_MESSAGES = [
     timestamp: new Date().toISOString(),
   },
 ];
+
+const LOCAL_CLEAR_KEY = 'bizpilot-ai-assistant-cleared';
 
 // Simple markdown-bold renderer
 const renderContent = (content) => {
@@ -51,6 +54,50 @@ const AIAssistant = () => {
   const inputRef = useRef(null);
 
   useEffect(() => {
+    let isMounted = true;
+
+    const restoreConversation = async () => {
+      if (window.sessionStorage.getItem(LOCAL_CLEAR_KEY) === 'true') {
+        aiService.loadHistory([]);
+        return;
+      }
+
+      try {
+        const response = await dashboardService.getAIInsights();
+        const savedInsights = response.data || [];
+        if (!isMounted) return;
+
+        aiService.loadHistory(savedInsights);
+        if (savedInsights.length > 0) {
+          const restoredMessages = savedInsights
+            .slice()
+            .sort((first, second) => new Date(first.createdAt) - new Date(second.createdAt))
+            .flatMap((insight) => [
+              {
+                id: `${insight._id}-question`,
+                role: 'user',
+                content: insight.question,
+                timestamp: insight.createdAt,
+              },
+              {
+                id: `${insight._id}-answer`,
+                role: 'assistant',
+                content: insight.answer,
+                timestamp: insight.createdAt,
+              },
+            ]);
+          setMessages(restoredMessages);
+        }
+      } catch (restoreError) {
+        console.warn('[BizPilot AI] Could not restore conversation history:', restoreError.message);
+      }
+    };
+
+    restoreConversation();
+    return () => { isMounted = false; };
+  }, []);
+
+  useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isThinking]);
 
@@ -76,6 +123,11 @@ const AIAssistant = () => {
     // Show only responses returned by the configured AI service.
     if (res.data) {
       setMessages((prev) => [...prev, res.data]);
+      void aiService.saveInsight({
+        question: trimmed,
+        answer: res.data.content,
+        source: res.data.source,
+      });
     } else if (res.message) {
       setError(res.message);
     }
@@ -93,6 +145,7 @@ const AIAssistant = () => {
     setMessages(INITIAL_MESSAGES);
     setInput('');
     setError('');
+    window.sessionStorage.setItem(LOCAL_CLEAR_KEY, 'true');
   };
 
   return (

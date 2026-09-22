@@ -599,7 +599,7 @@ const Customers = () => {
       {/* RETENTION CAMPAIGN BANNER                           */}
       {/* --------------------------------------------------- */}
       <>
-        <div className="p-4 rounded-2xl bg-gradient-to-r from-rose-50 via-white to-indigo-50 border border-rose-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm animate-fade-in">
+        <div className="retention-banner p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm animate-fade-in">
           <div className="flex items-center gap-3.5">
             <div className="p-2.5 rounded-xl bg-rose-100 text-rose-600 border border-rose-200 flex-shrink-0">
               <Zap className="w-5 h-5 text-rose-500 animate-pulse" />
@@ -607,7 +607,7 @@ const Customers = () => {
 
             <div>
               <div className="flex items-center gap-2">
-                <h4 className="text-sm font-semibold text-slate-900">
+                <h4 className="text-sm font-semibold text-[var(--text-primary)]">
                   {highRisk > 0 ? 'Autonomous Win-Back Agent Standing By' : 'Autonomous Win-Back Agent'}
                 </h4>
 
@@ -616,7 +616,7 @@ const Customers = () => {
                 </span>
               </div>
 
-                <p className="text-xs text-slate-500 mt-0.5">
+                <p className="text-xs text-[var(--text-secondary)] mt-0.5">
                 {highRisk > 0
                   ? 'Personalized retention messages will be generated for flagged high churn accounts and sent through the configured email service after confirmation.'
                   : 'No customer accounts currently meet the 70% churn-risk threshold.'}

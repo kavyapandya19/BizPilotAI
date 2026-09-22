@@ -19,7 +19,7 @@ const ProtectedRoute = () => {
 
   // If logged in, render the layout
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-50 text-slate-900">
+    <div className="flex h-screen overflow-hidden bg-slate-50 text-slate-900 transition-colors duration-200">
       <Sidebar />
       <div className="flex flex-col flex-1 overflow-hidden relative">
         <Navbar />

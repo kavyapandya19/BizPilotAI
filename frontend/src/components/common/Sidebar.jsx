@@ -20,7 +20,7 @@ const Sidebar = () => {
   ];
 
   return (
-    <aside className="w-64 bg-white border-r border-slate-200 flex flex-col z-20">
+    <aside className="w-64 bg-white border-r border-slate-200 flex flex-col z-20 transition-colors duration-200">
       <div className="h-20 flex items-center px-6 border-b border-slate-200">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-brand-600 flex items-center justify-center shadow-sm shadow-brand-500/20">
